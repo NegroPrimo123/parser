@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: hh-parser-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-root111}
+      POSTGRES_DB: ${DB_NAME:-hh_parser}
+    ports:
+      - "1357:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - hh-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hh-parser-app
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-root111}
+      DB_NAME: ${DB_NAME:-hh_parser}
+      SEARCH_QUERY: ${SEARCH_QUERY:-Golang developer}
+      PAGES: ${PAGES:-5}
+      VACANCIES_PER_PAGE: ${VACANCIES_PER_PAGE:-10}
+      WORKERS: ${WORKERS:-10}
+      RETRY_ATTEMPTS: ${RETRY_ATTEMPTS:-5}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      CSV_ENABLED: ${CSV_ENABLED:-true}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hh-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  hh-network:
+    driver: bridge
